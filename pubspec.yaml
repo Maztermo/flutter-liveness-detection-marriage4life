@@ -6,7 +6,7 @@ repository: "https://github.com/bagussubagja/flutter-liveness-detection-randomiz
 
 environment:
   sdk: ^3.5.3
-  flutter: '>=3.3.0'
+  flutter: ">=3.3.0"
 
 dependencies:
   flutter:
