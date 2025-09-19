@@ -21,7 +21,7 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
     return Scaffold(
       backgroundColor: widget.isDarkMode ? Colors.black : Colors.white,
       body: SafeArea(
-        minimum: const EdgeInsets.all(12),
+        minimum: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -51,7 +51,7 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     subtitle: Text(
-                      "Make sure you are in an area that has sufficient lighting and that your ears are not covered by anything",
+                      "Make sure you are in an area that has sufficient lighting and that your ears are not covered",
                       style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     title: Text(
@@ -79,7 +79,7 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
                       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     subtitle: Text(
-                      "The time limit given for the liveness detection system verification process is ${widget.duration ?? 45} seconds",
+                      "You have ${widget.duration ?? 45} seconds to complete the process",
                       style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     title: Text(
@@ -93,8 +93,8 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
             const SizedBox(height: 24),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: widget.isDarkMode ? Colors.black87 : const Color(0xFF2563EB),
-                foregroundColor: widget.isDarkMode ? Colors.white : Colors.black,
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
               icon: const Icon(Icons.camera_alt_outlined),
