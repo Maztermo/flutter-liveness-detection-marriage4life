@@ -40,51 +40,39 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
                 borderRadius: BorderRadius.circular(8),
                 color: widget.isDarkMode ? Colors.black87 : Colors.white,
                 boxShadow: !widget.isDarkMode
-                    ? [BoxShadow(color: Colors.grey.withOpacity(0.2), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))]
+                    ? [BoxShadow(color: Colors.grey.withValues(alpha: 0.2), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))]
                     : null,
               ),
               child: Column(
                 children: [
                   ListTile(
-                    leading: Text(
-                      '1',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
+                    title: Text(
+                      "1. Sufficient Lighting",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     subtitle: Text(
                       "Make sure you are in an area that has sufficient lighting and that your ears are not covered",
                       style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
-                    title: Text(
-                      "Sufficient Lighting",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
-                    ),
                   ),
                   ListTile(
-                    leading: Text(
-                      '2',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
+                    title: Text(
+                      "2. Keep phone at eye level",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     subtitle: Text(
                       "Hold the phone at eye level and look straight at the camera",
                       style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
-                    title: Text(
-                      "Keep phone at eye level",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
-                    ),
                   ),
                   ListTile(
-                    leading: Text(
-                      '3',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
+                    title: Text(
+                      "3. Time Limit",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                     subtitle: Text(
                       "You have ${widget.duration ?? 45} seconds to complete the process",
                       style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
-                    ),
-                    title: Text(
-                      "Time Limit",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: widget.isDarkMode ? Colors.white : Colors.black),
                     ),
                   ),
                 ],
