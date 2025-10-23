@@ -16,7 +16,7 @@ class MachineLearningKitHelper {
   );
 
   Future<List<Face>> processInputImage(InputImage imgFile) async {
-    const maxAttempts = 3;
+    const maxAttempts = 1; // Reduced from 3 to 1 to prevent OOM
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       final List<Face> faces = await faceDetector.processImage(imgFile);

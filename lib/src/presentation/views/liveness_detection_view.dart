@@ -37,6 +37,8 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
   bool _isBusy = false;
   bool _isTakingPicture = false;
   Timer? _timerToDetectFace;
+  int _frameCounter = 0;
+  static const int _processEveryNthFrame = 3;
 
   // Detection state variables
   late bool _isInfoStepCompleted;
@@ -243,7 +245,7 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.medium, // Changed from high to reduce memory usage and prevent OOM
+      ResolutionPreset.medium, // Changed to low resolution to prevent OOM
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420, // Fix for Android ImageFormat compatibility with ML Kit
     );
@@ -262,6 +264,12 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
   }
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
+    // Skip frames to reduce memory pressure
+    _frameCounter++;
+    if (_frameCounter % _processEveryNthFrame != 0) {
+      return; // Skip this frame
+    }
+
     final WriteBuffer allBytes = WriteBuffer();
     for (final Plane plane in cameraImage.planes) {
       allBytes.putUint8List(plane.bytes);
@@ -277,8 +285,9 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
     if (imageRotation == null) return;
 
-    final inputImageFormat = InputImageFormatValue.fromRawValue(cameraImage.format.raw);
-    if (inputImageFormat == null) return;
+    // Use platform-specific hardcoded format instead of fromRawValue
+    // This fixes the "ImageFormat is not supported" error
+    final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.yuv420;
 
     final inputImageData = InputImageMetadata(
       size: imageSize,
