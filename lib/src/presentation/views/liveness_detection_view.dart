@@ -267,41 +267,61 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     // Skip frames to reduce memory pressure
     _frameCounter++;
     if (_frameCounter % _processEveryNthFrame != 0) {
-      return; // Skip this frame
+      return;
     }
 
-    final WriteBuffer allBytes = WriteBuffer();
-    for (final Plane plane in cameraImage.planes) {
-      allBytes.putUint8List(plane.bytes);
+    // For NV21: Y plane + interleaved UV plane (NOT all planes!)
+    final yPlaneBytes = cameraImage.planes[0].bytes;
+    
+    // Check if this is the semi-planar format (NV21/NV12)
+    if (cameraImage.planes[0].bytesPerPixel == 1 && 
+        cameraImage.planes.length > 1 &&
+        cameraImage.planes[1].bytesPerPixel == 2) {
+      
+      // Plane 1 is already interleaved UV data
+      final uvPlaneBytes = cameraImage.planes[1].bytes;
+      
+      final WriteBuffer allBytes = WriteBuffer();
+      allBytes.putUint8List(yPlaneBytes);      // Y plane
+      allBytes.putUint8List(uvPlaneBytes);     // Interleaved UV plane (NOT plane 2!)
+      final bytes = allBytes.done().buffer.asUint8List();
+      
+      // Verify byte array size
+      final expectedSize = (cameraImage.width * cameraImage.height * 1.5).toInt();
+      if (bytes.length != expectedSize) {
+        debugPrint('Warning: NV21 byte array size mismatch. Expected: $expectedSize, Got: ${bytes.length}');
+        return;
+      }
+
+      final Size imageSize = Size(
+        cameraImage.width.toDouble(),
+        cameraImage.height.toDouble(),
+      );
+
+      final camera = availableCams[_cameraIndex];
+      final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+      if (imageRotation == null) return;
+
+      // Use NV21 format for Android
+      final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.nv21;
+
+      final inputImageData = InputImageMetadata(
+        size: imageSize,
+        rotation: imageRotation,
+        format: inputImageFormat,
+        bytesPerRow: cameraImage.planes[0].bytesPerRow,
+      );
+
+      final inputImage = InputImage.fromBytes(
+        metadata: inputImageData,
+        bytes: bytes,
+      );
+
+      _processImage(inputImage);
+    } else {
+      // Fallback for other formats (shouldn't happen with NV21)
+      debugPrint('Unexpected camera format: planes=${cameraImage.planes.length}, bytesPerPixel=${cameraImage.planes[0].bytesPerPixel}');
     }
-    final bytes = allBytes.done().buffer.asUint8List();
-
-    final Size imageSize = Size(
-      cameraImage.width.toDouble(),
-      cameraImage.height.toDouble(),
-    );
-
-    final camera = availableCams[_cameraIndex];
-    final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
-    if (imageRotation == null) return;
-
-    // Use platform-specific hardcoded format instead of fromRawValue
-    // Android cameras output NV21 format (a YUV420 variant)
-    final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.nv21;
-
-    final inputImageData = InputImageMetadata(
-      size: imageSize,
-      rotation: imageRotation,
-      format: inputImageFormat,
-      bytesPerRow: cameraImage.planes[0].bytesPerRow,
-    );
-
-    final inputImage = InputImage.fromBytes(
-      metadata: inputImageData,
-      bytes: bytes,
-    );
-
-    _processImage(inputImage);
   }
 
   Future<void> _processImage(InputImage inputImage) async {
