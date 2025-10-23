@@ -37,8 +37,7 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
   bool _isBusy = false;
   bool _isTakingPicture = false;
   Timer? _timerToDetectFace;
-  int _frameCounter = 0;
-  static const int _processEveryNthFrame = 3;
+  int _frameCounter = 0; // Keep for debug logging only
 
   // Detection state variables
   late bool _isInfoStepCompleted;
@@ -264,32 +263,42 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
   }
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
-    // Skip frames to reduce memory pressure
     _frameCounter++;
-    if (_frameCounter % _processEveryNthFrame != 0) {
-      return;
+
+    // Debug logging every 30 frames
+    if (_frameCounter % 30 == 0) {
+      debugPrint('\n=== FRAME $_frameCounter DEBUG ===');
+      debugPrint('Image: ${cameraImage.width}x${cameraImage.height}');
+      debugPrint('Format group: ${cameraImage.format.group}');
+      debugPrint('Format raw: ${cameraImage.format.raw}');
+      debugPrint('Planes: ${cameraImage.planes.length}');
+      for (var i = 0; i < cameraImage.planes.length; i++) {
+        debugPrint('  Plane[$i]: bytesPerPixel=${cameraImage.planes[i].bytesPerPixel}, bytesPerRow=${cameraImage.planes[i].bytesPerRow}, length=${cameraImage.planes[i].bytes.length}');
+      }
     }
 
     // For NV21: Y plane + interleaved UV plane (NOT all planes!)
     final yPlaneBytes = cameraImage.planes[0].bytes;
-    
+
     // Check if this is the semi-planar format (NV21/NV12)
-    if (cameraImage.planes[0].bytesPerPixel == 1 && 
-        cameraImage.planes.length > 1 &&
-        cameraImage.planes[1].bytesPerPixel == 2) {
-      
+    if (cameraImage.planes[0].bytesPerPixel == 1 && cameraImage.planes.length > 1 && cameraImage.planes[1].bytesPerPixel == 2) {
       // Plane 1 is already interleaved UV data
       final uvPlaneBytes = cameraImage.planes[1].bytes;
-      
+
       final WriteBuffer allBytes = WriteBuffer();
-      allBytes.putUint8List(yPlaneBytes);      // Y plane
-      allBytes.putUint8List(uvPlaneBytes);     // Interleaved UV plane (NOT plane 2!)
+      allBytes.putUint8List(yPlaneBytes); // Y plane
+      allBytes.putUint8List(uvPlaneBytes); // Interleaved UV plane (NOT plane 2!)
       final bytes = allBytes.done().buffer.asUint8List();
-      
+
       // Verify byte array size
       final expectedSize = (cameraImage.width * cameraImage.height * 1.5).toInt();
+
+      if (_frameCounter % 30 == 0) {
+        debugPrint('NV21 bytes: ${bytes.length}, expected: $expectedSize');
+      }
+
       if (bytes.length != expectedSize) {
-        debugPrint('Warning: NV21 byte array size mismatch. Expected: $expectedSize, Got: ${bytes.length}');
+        debugPrint('⚠️ SIZE MISMATCH! Expected: $expectedSize, Got: ${bytes.length}');
         return;
       }
 
@@ -300,10 +309,23 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
 
       final camera = availableCams[_cameraIndex];
       final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
-      if (imageRotation == null) return;
+
+      if (_frameCounter % 30 == 0) {
+        debugPrint('Sensor orientation: ${camera.sensorOrientation}');
+        debugPrint('Image rotation: $imageRotation');
+      }
+
+      if (imageRotation == null) {
+        debugPrint('⚠️ imageRotation is null!');
+        return;
+      }
 
       // Use NV21 format for Android
       final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.nv21;
+
+      if (_frameCounter % 30 == 0) {
+        debugPrint('Input format: $inputImageFormat');
+      }
 
       final inputImageData = InputImageMetadata(
         size: imageSize,
@@ -317,18 +339,39 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
         bytes: bytes,
       );
 
+      if (_frameCounter % 30 == 0) {
+        debugPrint('Calling _processImage...\n');
+      }
+
       _processImage(inputImage);
     } else {
-      // Fallback for other formats (shouldn't happen with NV21)
-      debugPrint('Unexpected camera format: planes=${cameraImage.planes.length}, bytesPerPixel=${cameraImage.planes[0].bytesPerPixel}');
+      debugPrint('⚠️ Unexpected camera format!');
+      debugPrint('  planes.length: ${cameraImage.planes.length}');
+      debugPrint('  planes[0].bytesPerPixel: ${cameraImage.planes[0].bytesPerPixel}');
+      if (cameraImage.planes.length > 1) {
+        debugPrint('  planes[1].bytesPerPixel: ${cameraImage.planes[1].bytesPerPixel}');
+      }
     }
   }
 
   Future<void> _processImage(InputImage inputImage) async {
-    if (_isBusy) return;
+    if (_frameCounter % 30 == 0) {
+      debugPrint('_processImage called. _isBusy: $_isBusy');
+    }
+
+    if (_isBusy) {
+      if (_frameCounter % 30 == 0) {
+        debugPrint('⚠️ Skipping frame - already busy');
+      }
+      return;
+    }
     _isBusy = true;
 
     final faces = await MachineLearningKitHelper.instance.processInputImage(inputImage);
+
+    if (_frameCounter % 30 == 0) {
+      debugPrint('Faces from ML Kit: ${faces.length}');
+    }
 
     if (inputImage.metadata?.size != null && inputImage.metadata?.rotation != null) {
       if (faces.isEmpty) {
