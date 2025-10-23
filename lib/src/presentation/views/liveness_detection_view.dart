@@ -243,7 +243,7 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.high,
+      ResolutionPreset.medium, // Changed from high to reduce memory usage and prevent OOM
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420, // Fix for Android ImageFormat compatibility with ML Kit
     );
