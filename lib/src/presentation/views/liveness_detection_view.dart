@@ -286,16 +286,30 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
       // Plane 1 is already interleaved UV data - use it directly!
       final uvPlaneBytes = cameraImage.planes[1].bytes;
 
+      // 🔍 DEBUG: Log actual sizes
+      if (_frameCounter % 30 == 0) {
+        debugPrint('\n=== BYTE SIZE DEBUG ===');
+        debugPrint('yPlaneBytes.length: ${yPlaneBytes.length}');
+        debugPrint('uvPlaneBytes.length: ${uvPlaneBytes.length}');
+        debugPrint('Expected Y: ${cameraImage.width * cameraImage.height}');
+        debugPrint('Expected UV: ${(cameraImage.width * cameraImage.height / 2).toInt()}');
+      }
+
       final WriteBuffer allBytes = WriteBuffer();
-      allBytes.putUint8List(yPlaneBytes);      // Add entire Y plane
-      allBytes.putUint8List(uvPlaneBytes);     // Add entire UV plane (no loop needed!)
+      allBytes.putUint8List(yPlaneBytes); // Add entire Y plane
+      allBytes.putUint8List(uvPlaneBytes); // Add entire UV plane (no loop needed!)
       final bytes = allBytes.done().buffer.asUint8List();
 
       // Verify byte array size
       final expectedSize = (cameraImage.width * cameraImage.height * 1.5).toInt();
 
       if (_frameCounter % 30 == 0) {
-        debugPrint('NV21 bytes: ${bytes.length}, expected: $expectedSize');
+        debugPrint('Final bytes.length: ${bytes.length}');
+        debugPrint('Expected total: $expectedSize');
+        if (bytes.length != expectedSize) {
+          debugPrint('⚠️ SIZE MISMATCH! Difference: ${bytes.length - expectedSize}');
+        }
+        debugPrint('======================\n');
       }
 
       if (bytes.length != expectedSize) {
