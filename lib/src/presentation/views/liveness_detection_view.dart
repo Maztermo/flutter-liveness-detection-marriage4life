@@ -40,6 +40,8 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
   bool _isTakingPicture = false;
   Timer? _timerToDetectFace;
   int _frameCounter = 0; // Keep for debug logging only
+  int _consecutiveFramesWithoutFace = 0; // Counter for tolerance
+  static const int _maxFramesWithoutFaceBeforeReset = 15; // 0.5 seconds at 30fps
 
   // Detection state variables
   late bool _isInfoStepCompleted;
@@ -408,9 +410,24 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
 
     if (inputImage.metadata?.size != null && inputImage.metadata?.rotation != null) {
       if (faces.isEmpty) {
-        _resetSteps();
+        _consecutiveFramesWithoutFace++;
+        
+        if (_frameCounter % 30 == 0) {
+          debugPrint('No face detected. Consecutive frames: $_consecutiveFramesWithoutFace');
+        }
+        
+        // Only reset if face is lost for multiple consecutive frames (0.5 seconds)
+        if (_consecutiveFramesWithoutFace >= _maxFramesWithoutFaceBeforeReset) {
+          debugPrint('⚠️ Face lost for too long - resetting steps');
+          _resetSteps();
+          _consecutiveFramesWithoutFace = 0; // Reset counter after resetting steps
+        }
+        
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
+        // Face detected - reset the lost frame counter
+        _consecutiveFramesWithoutFace = 0;
+        
         if (mounted) setState(() => _faceDetectedState = true);
         final currentIndex = _stepsKey.currentState?.currentIndex ?? 0;
         if (widget.config.useCustomizedLabel) {
@@ -430,7 +447,10 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
         }
       }
     } else {
-      _resetSteps();
+      // Invalid metadata - just skip this frame, don't reset
+      if (_frameCounter % 30 == 0) {
+        debugPrint('⚠️ Invalid metadata - skipping frame');
+      }
     }
 
     _isBusy = false;
