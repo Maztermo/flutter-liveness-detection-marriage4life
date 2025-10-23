@@ -283,22 +283,12 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
 
     // Check if this is the semi-planar format (NV21/NV12)
     if (cameraImage.planes[0].bytesPerPixel == 1 && cameraImage.planes.length > 1 && cameraImage.planes[1].bytesPerPixel == 2) {
-      // Plane 1 is already interleaved UV data
-      // Calculate the exact UV plane size needed (may have padding in actual bytes)
-      final uvRowBytes = cameraImage.planes[1].bytesPerRow;
-      
+      // Plane 1 is already interleaved UV data - use it directly!
+      final uvPlaneBytes = cameraImage.planes[1].bytes;
+
       final WriteBuffer allBytes = WriteBuffer();
-      allBytes.putUint8List(yPlaneBytes); // Y plane
-      
-      // Only copy the actual UV data, excluding any padding
-      final uvHeight = cameraImage.height ~/ 2;
-      for (int i = 0; i < uvHeight; i++) {
-        final int offset = i * uvRowBytes;
-        allBytes.putUint8List(
-          cameraImage.planes[1].bytes.sublist(offset, offset + cameraImage.width)
-        );
-      }
-      
+      allBytes.putUint8List(yPlaneBytes);      // Add entire Y plane
+      allBytes.putUint8List(uvPlaneBytes);     // Add entire UV plane (no loop needed!)
       final bytes = allBytes.done().buffer.asUint8List();
 
       // Verify byte array size
