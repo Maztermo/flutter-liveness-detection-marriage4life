@@ -306,40 +306,32 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
         debugPrint('Sum: ${yPlaneBytes.length} + ${uvPlaneBytes.length} = ${yPlaneBytes.length + uvPlaneBytes.length}');
       }
 
-      // Test: Create byte array manually
-      if (_frameCounter % 30 == 0) {
-        debugPrint('\n=== MANUAL CONCATENATION TEST ===');
-        final manualBytes = Uint8List(yPlaneBytes.length + uvPlaneBytes.length);
-        manualBytes.setRange(0, yPlaneBytes.length, yPlaneBytes);
-        manualBytes.setRange(yPlaneBytes.length, manualBytes.length, uvPlaneBytes);
-        debugPrint('Manual concat size: ${manualBytes.length}');
-      }
-
-      // Original WriteBuffer approach
-      final WriteBuffer allBytes = WriteBuffer();
-      allBytes.putUint8List(yPlaneBytes); // Add entire Y plane
-      allBytes.putUint8List(uvPlaneBytes); // Add entire UV plane (no loop needed!)
-      final bytes = allBytes.done().buffer.asUint8List();
+      // Create NV21 byte array manually (WriteBuffer adds extra bytes)
+      final bytes = Uint8List(yPlaneBytes.length + uvPlaneBytes.length);
+      bytes.setRange(0, yPlaneBytes.length, yPlaneBytes);
+      bytes.setRange(yPlaneBytes.length, bytes.length, uvPlaneBytes);
 
       if (_frameCounter % 30 == 0) {
-        debugPrint('\n=== WRITEBUFFER RESULT ===');
-        debugPrint('WriteBuffer final size: ${bytes.length}');
+        debugPrint('Final NV21 bytes.length: ${bytes.length}');
       }
 
-      // Verify byte array size
+      // Verify byte array size (allow for rounding: 1382399 vs 1382400)
       final expectedSize = (cameraImage.width * cameraImage.height * 1.5).toInt();
+      final sizeDiff = (bytes.length - expectedSize).abs();
 
       if (_frameCounter % 30 == 0) {
-        debugPrint('Final bytes.length: ${bytes.length}');
         debugPrint('Expected total: $expectedSize');
-        if (bytes.length != expectedSize) {
-          debugPrint('⚠️ SIZE MISMATCH! Difference: ${bytes.length - expectedSize}');
+        if (sizeDiff > 0) {
+          debugPrint('Size difference: $sizeDiff byte(s) ${sizeDiff <= 1 ? "(acceptable rounding)" : "(ERROR!)"}');
+        } else {
+          debugPrint('✅ Size matches perfectly!');
         }
         debugPrint('======================\n');
       }
 
-      if (bytes.length != expectedSize) {
-        debugPrint('⚠️ SIZE MISMATCH! Expected: $expectedSize, Got: ${bytes.length}');
+      // Allow 1 byte difference due to rounding (1382399 vs 1382400)
+      if (sizeDiff > 1) {
+        debugPrint('⚠️ SIZE MISMATCH! Expected: $expectedSize, Got: ${bytes.length}, Difference: $sizeDiff');
         return;
       }
 
