@@ -245,7 +245,7 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.medium, // Balanced resolution for face detection with acceptable memory usage
+      ResolutionPreset.high, // High resolution for better image quality
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420, // Request YUV420 format (Android uses NV21 variant)
     );
