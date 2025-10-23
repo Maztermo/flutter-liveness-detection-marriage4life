@@ -1,4 +1,6 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'dart:io' show Platform;
+import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -281,6 +283,14 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     // For NV21: Y plane + interleaved UV plane (NOT all planes!)
     final yPlaneBytes = cameraImage.planes[0].bytes;
 
+    // 🔍 DEBUG: Verify yPlaneBytes is really planes[0]
+    if (_frameCounter % 30 == 0) {
+      debugPrint('\n=== PLANE ASSIGNMENT DEBUG ===');
+      debugPrint('yPlaneBytes == planes[0].bytes: ${identical(yPlaneBytes, cameraImage.planes[0].bytes)}');
+      debugPrint('planes[0].bytes.length: ${cameraImage.planes[0].bytes.length}');
+      debugPrint('yPlaneBytes.length: ${yPlaneBytes.length}');
+    }
+
     // Check if this is the semi-planar format (NV21/NV12)
     if (cameraImage.planes[0].bytesPerPixel == 1 && cameraImage.planes.length > 1 && cameraImage.planes[1].bytesPerPixel == 2) {
       // Plane 1 is already interleaved UV data - use it directly!
@@ -293,12 +303,28 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
         debugPrint('uvPlaneBytes.length: ${uvPlaneBytes.length}');
         debugPrint('Expected Y: ${cameraImage.width * cameraImage.height}');
         debugPrint('Expected UV: ${(cameraImage.width * cameraImage.height / 2).toInt()}');
+        debugPrint('Sum: ${yPlaneBytes.length} + ${uvPlaneBytes.length} = ${yPlaneBytes.length + uvPlaneBytes.length}');
       }
 
+      // Test: Create byte array manually
+      if (_frameCounter % 30 == 0) {
+        debugPrint('\n=== MANUAL CONCATENATION TEST ===');
+        final manualBytes = Uint8List(yPlaneBytes.length + uvPlaneBytes.length);
+        manualBytes.setRange(0, yPlaneBytes.length, yPlaneBytes);
+        manualBytes.setRange(yPlaneBytes.length, manualBytes.length, uvPlaneBytes);
+        debugPrint('Manual concat size: ${manualBytes.length}');
+      }
+
+      // Original WriteBuffer approach
       final WriteBuffer allBytes = WriteBuffer();
       allBytes.putUint8List(yPlaneBytes); // Add entire Y plane
       allBytes.putUint8List(uvPlaneBytes); // Add entire UV plane (no loop needed!)
       final bytes = allBytes.done().buffer.asUint8List();
+
+      if (_frameCounter % 30 == 0) {
+        debugPrint('\n=== WRITEBUFFER RESULT ===');
+        debugPrint('WriteBuffer final size: ${bytes.length}');
+      }
 
       // Verify byte array size
       final expectedSize = (cameraImage.width * cameraImage.height * 1.5).toInt();
