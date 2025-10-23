@@ -245,9 +245,9 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.medium, // Changed to low resolution to prevent OOM
+      ResolutionPreset.medium, // Balanced resolution for face detection with acceptable memory usage
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.yuv420, // Fix for Android ImageFormat compatibility with ML Kit
+      imageFormatGroup: ImageFormatGroup.yuv420, // Request YUV420 format (Android uses NV21 variant)
     );
 
     _cameraController?.initialize().then((_) {
@@ -286,8 +286,8 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
     if (imageRotation == null) return;
 
     // Use platform-specific hardcoded format instead of fromRawValue
-    // This fixes the "ImageFormat is not supported" error
-    final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.yuv420;
+    // Android cameras output NV21 format (a YUV420 variant)
+    final inputImageFormat = Platform.isIOS ? InputImageFormat.bgra8888 : InputImageFormat.nv21;
 
     final inputImageData = InputImageMetadata(
       size: imageSize,
