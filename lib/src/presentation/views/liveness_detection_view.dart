@@ -241,7 +241,12 @@ class _LivenessDetectionScreenState extends State<LivenessDetectionView> {
 
   void _startLiveFeed() async {
     final camera = availableCams[_cameraIndex];
-    _cameraController = CameraController(camera, ResolutionPreset.high, enableAudio: false);
+    _cameraController = CameraController(
+      camera,
+      ResolutionPreset.high,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420, // Fix for Android ImageFormat compatibility with ML Kit
+    );
 
     _cameraController?.initialize().then((_) {
       if (!mounted) return;
