@@ -79,15 +79,10 @@ class _LivenessDetectionTutorialScreenState extends State<LivenessDetectionTutor
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              icon: const Icon(Icons.camera_alt_outlined),
-              onPressed: () => widget.onStartTap(),
-              label: const Text("I'm ready - Start"),
+            GradientButton(
+              label: "I'm ready - Start",
+              icon: Icons.camera_alt_outlined,
+              onPressed: widget.onStartTap,
             ),
             const SizedBox(height: 10),
             const Spacer(),
