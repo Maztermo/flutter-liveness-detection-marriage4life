@@ -384,7 +384,11 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       }
       
       await HapticFeedback.mediumImpact();
-      await _cameraController?.stopImageStream();
+      
+      // Only stop image stream if it's actually running
+      if (_cameraController?.value.isStreamingImages == true) {
+        await _cameraController?.stopImageStream();
+      }
 
       final XFile? clickedImage = await _cameraController?.takePicture();
       if (clickedImage == null) {
@@ -458,33 +462,53 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   }
 
   /// Retry taking the photo after validation failure
-  void _retryPhotoCapture() {
+  Future<void> _retryPhotoCapture() async {
     if (!mounted) return;
+    
+    // First reset state and hide preview, but don't show camera yet
     setState(() {
       _photoValidationFailed = false;
       _isTakingPicture = false;
       _capturedImagePath = null;
       _showPhotoPreview = false;
+      _showPhotoCapturePrompt = false; // Hide camera until it's ready
+    });
+    
+    // Wait for camera to be ready before showing it
+    await _restartCameraForPhoto();
+    
+    if (!mounted) return;
+    setState(() {
       _showPhotoCapturePrompt = true;
     });
-    _restartCameraForPhoto();
   }
 
   /// Restarts the camera for photo capture without restarting liveness steps
   Future<void> _restartCameraForPhoto() async {
-    // Dispose old controller first
-    await _cameraController?.dispose();
+    // Store reference and null out field to prevent access to disposed controller
+    final oldController = _cameraController;
+    _cameraController = null;
+    
+    // Dispose old controller
+    await oldController?.dispose();
+    
+    if (!mounted) return;
     
     final camera = availableCams[_cameraIndex];
-    _cameraController = CameraController(
+    final newController = CameraController(
       camera,
       ResolutionPreset.high,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.bgra8888,
     );
 
-    await _cameraController?.initialize();
-    if (!mounted) return;
+    await newController.initialize();
+    if (!mounted) {
+      await newController.dispose();
+      return;
+    }
+    
+    _cameraController = newController;
     setState(() {});
   }
 
@@ -993,27 +1017,55 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   }
 
   /// Camera view when in photo capture mode
+  /// Matches the layout structure of LivenessDetectionStepOverlayWidget
   Widget _buildPhotoCaptureCamera() {
+    // Calculate scale the same way as LivenessDetectionStepOverlayWidget
+    double scale = 1.0;
+    if (_cameraController != null && _cameraController!.value.isInitialized) {
+      final cameraAspectRatio = _cameraController!.value.aspectRatio;
+      const containerAspectRatio = 1.0;
+      scale = cameraAspectRatio / containerAspectRatio;
+      if (scale < 1.0) {
+        scale = 1.0 / scale;
+      }
+    }
+
     return SafeArea(
       minimum: const EdgeInsets.all(16),
       child: Container(
         margin: const EdgeInsets.all(12),
+        height: double.infinity,
+        width: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.max,
           children: [
+            // Camera circle - same as _buildCircularCamera in overlay widget
             SizedBox(
               height: 300,
               width: 300,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(1000),
                 child: Transform.scale(
-                  scale: _cameraController!.value.aspectRatio,
+                  scale: scale,
                   child: Center(
                     child: CameraPreview(_cameraController!),
                   ),
                 ),
               ),
             ),
+            // Spacers to match the layout height of the liveness overlay
+            // This ensures the camera appears at the same vertical position
+            const SizedBox(height: 16),
+            // Placeholder for face detection status height
+            const SizedBox(height: 32),
+            const SizedBox(height: 16),
+            // Placeholder for step page view height
+            SizedBox(height: MediaQuery.of(context).size.height / 10),
+            const SizedBox(height: 16),
+            // Placeholder for loader
+            const SizedBox(height: 20),
           ],
         ),
       ),
