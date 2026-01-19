@@ -586,6 +586,8 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
       _isValidatingPhoto = false;
       _photoValidationFailed = true;
     });
+    // Restart camera so user can try again
+    _restartCameraForPhoto();
   }
 
   /// Retry taking the photo after validation failure
@@ -602,7 +604,10 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
   }
 
   /// Restarts the camera for photo capture without restarting liveness steps
-  void _restartCameraForPhoto() async {
+  Future<void> _restartCameraForPhoto() async {
+    // Dispose old controller first
+    await _cameraController?.dispose();
+    
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
@@ -611,10 +616,9 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
-    _cameraController?.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {});
-    });
+    await _cameraController?.initialize();
+    if (!mounted) return;
+    setState(() {});
   }
 
   /// User confirms the captured photo
@@ -1120,25 +1124,28 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
 
   /// Camera view when in photo capture mode
   Widget _buildPhotoCaptureCamera() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 60),
-          SizedBox(
-            height: 300,
-            width: 300,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(1000),
-              child: Transform.scale(
-                scale: _cameraController!.value.aspectRatio,
-                child: Center(
-                  child: CameraPreview(_cameraController!),
+    return SafeArea(
+      minimum: const EdgeInsets.all(16),
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 300,
+              width: 300,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(1000),
+                child: Transform.scale(
+                  scale: _cameraController!.value.aspectRatio,
+                  child: Center(
+                    child: CameraPreview(_cameraController!),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
