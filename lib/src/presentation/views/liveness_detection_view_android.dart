@@ -515,7 +515,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
           _photoValidationFailed = false;
         });
       }
-      
+
       await HapticFeedback.mediumImpact();
       await _cameraController?.stopImageStream();
 
@@ -529,7 +529,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
 
       // Validate that the photo contains a face
       final bool hasFace = await _validatePhotoHasFace(finalImage);
-      
+
       if (!hasFace) {
         debugPrint('Photo validation failed: No face detected in captured image');
         _handlePhotoValidationFailed();
@@ -537,7 +537,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
       }
 
       debugPrint('Final image path: ${finalImage?.path}');
-      
+
       // Show preview for user confirmation
       if (mounted) {
         setState(() {
@@ -749,10 +749,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
                 ],
 
                 // Take Photo / Validating button
-                if (_isValidatingPhoto)
-                  _buildValidatingButton()
-                else
-                  _buildTakePhotoButton(),
+                if (_isValidatingPhoto) _buildValidatingButton() else _buildTakePhotoButton(),
 
                 const SizedBox(height: 16),
 
@@ -900,12 +897,36 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Make sure your face is clearly visible',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 14,
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'We use this photo to confirm your identity and keep the platform safe. Only authorized Marriage4Life staff can access it, and it\'s never displayed publicly.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1182,4 +1203,3 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     }
   }
 }
-
