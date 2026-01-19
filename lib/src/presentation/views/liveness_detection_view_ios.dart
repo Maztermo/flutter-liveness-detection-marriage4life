@@ -463,8 +463,25 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       _isTakingPicture = false;
       _capturedImagePath = null;
       _showPhotoPreview = false;
+      _showPhotoCapturePrompt = true;
     });
-    _startLiveFeed();
+    _restartCameraForPhoto();
+  }
+
+  /// Restarts the camera for photo capture without restarting liveness steps
+  void _restartCameraForPhoto() async {
+    final camera = availableCams[_cameraIndex];
+    _cameraController = CameraController(
+      camera,
+      ResolutionPreset.high,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.bgra8888,
+    );
+
+    _cameraController?.initialize().then((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   /// User confirms the captured photo
