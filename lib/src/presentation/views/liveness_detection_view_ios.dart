@@ -44,12 +44,12 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   static late List<LivenessDetectionStepItem> _cachedShuffledSteps;
   static bool _isShuffled = false;
 
-  // Photo capture overlay state
-  bool _showPhotoCaptureScreen = false;
-  int _countdownValue = 3;
-  Timer? _countdownTimer;
-  bool _showRetryScreen = false;
+  // Photo capture state
+  bool _showPhotoCapturePrompt = false;
+  bool _showPhotoPreview = false;
   bool _isValidatingPhoto = false;
+  bool _photoValidationFailed = false;
+  String? _capturedImagePath;
 
   // Brightness Screen
   Future<void> setApplicationBrightness(double brightness) async {
@@ -199,8 +199,6 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   void dispose() {
     _timerToDetectFace?.cancel();
     _timerToDetectFace = null;
-    _countdownTimer?.cancel();
-    _countdownTimer = null;
     _cameraController?.dispose();
     shuffleListLivenessChallenge(
         list: widget.config.useCustomizedLabel && widget.config.customizedLabel != null
@@ -381,13 +379,16 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
         setState(() {
           _isTakingPicture = true;
           _isValidatingPhoto = true;
+          _photoValidationFailed = false;
         });
       }
+      
+      await HapticFeedback.mediumImpact();
       await _cameraController?.stopImageStream();
 
       final XFile? clickedImage = await _cameraController?.takePicture();
       if (clickedImage == null) {
-        _handlePhotoValidationFailed();
+        _handlePhotoCaptureFailed();
         return;
       }
 
@@ -403,10 +404,19 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       }
 
       debugPrint('Final image path: ${finalImage?.path}');
-      _onDetectionCompleted(imgToReturn: finalImage);
+      
+      // Show preview for user confirmation
+      if (mounted) {
+        setState(() {
+          _capturedImagePath = finalImage?.path;
+          _isValidatingPhoto = false;
+          _showPhotoCapturePrompt = false;
+          _showPhotoPreview = true;
+        });
+      }
     } catch (e) {
       debugPrint('Error taking picture: $e');
-      _handlePhotoValidationFailed();
+      _handlePhotoCaptureFailed();
     }
   }
 
@@ -425,14 +435,23 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     }
   }
 
+  /// Handles when photo capture fails
+  void _handlePhotoCaptureFailed() {
+    if (!mounted) return;
+    setState(() {
+      _isTakingPicture = false;
+      _isValidatingPhoto = false;
+    });
+    _startLiveFeed();
+  }
+
   /// Handles when photo validation fails (no face detected)
   void _handlePhotoValidationFailed() {
     if (!mounted) return;
     setState(() {
       _isTakingPicture = false;
       _isValidatingPhoto = false;
-      _showPhotoCaptureScreen = false;
-      _showRetryScreen = true;
+      _photoValidationFailed = true;
     });
   }
 
@@ -440,41 +459,27 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   void _retryPhotoCapture() {
     if (!mounted) return;
     setState(() {
-      _showRetryScreen = false;
+      _photoValidationFailed = false;
       _isTakingPicture = false;
+      _capturedImagePath = null;
+      _showPhotoPreview = false;
     });
     _startLiveFeed();
-    // Show the countdown overlay again after a brief delay
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) _showPhotoCaptureOverlay();
-    });
   }
 
-  /// Shows the photo capture screen with countdown
+  /// User confirms the captured photo
+  void _confirmPhoto() {
+    if (_capturedImagePath == null) return;
+    _onDetectionCompleted(imgToReturn: XFile(_capturedImagePath!));
+  }
+
+  /// Shows the photo capture prompt (camera visible with take photo button)
   void _showPhotoCaptureOverlay() {
     if (!mounted) return;
+    // Cancel the liveness timer since steps are complete
+    _timerToDetectFace?.cancel();
     setState(() {
-      _showPhotoCaptureScreen = true;
-      _countdownValue = 3;
-    });
-    _startCountdown();
-  }
-
-  /// Starts the 3-second countdown
-  void _startCountdown() {
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_countdownValue <= 1) {
-        timer.cancel();
-        _takePicture();
-      } else {
-        HapticFeedback.lightImpact();
-        setState(() => _countdownValue--);
-      }
+      _showPhotoCapturePrompt = true;
     });
   }
 
@@ -530,338 +535,344 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     if (mounted) setState(() => _isProcessingStep = false);
   }
 
-  Widget _buildPhotoCaptureOverlay() {
+  /// Bottom overlay with "Take Photo" button - camera remains visible
+  Widget _buildPhotoCapturePrompt() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.black.withValues(alpha: 0.7),
+              Colors.black.withValues(alpha: 0.9),
+            ],
+            stops: const [0.0, 0.3, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Validation failed message
+                if (_photoValidationFailed) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFEF4444),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No face detected. Please try again.',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else ...[
+                  // Title
+                  const Text(
+                    'Take your photo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Position your face in the circle and tap the button',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Take Photo / Validating button
+                if (_isValidatingPhoto)
+                  _buildValidatingButton()
+                else
+                  _buildTakePhotoButton(),
+
+                const SizedBox(height: 16),
+
+                // Cancel button
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTakePhotoButton() {
+    return GestureDetector(
+      onTap: _isTakingPicture ? null : _takePicture,
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF5A8FD4), Color(0xFFD47A9E)],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF5A8FD4).withValues(alpha: 0.4),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: const Color(0xFFD47A9E).withValues(alpha: 0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+          ),
+          child: const Icon(
+            Icons.camera_alt_rounded,
+            color: Colors.white,
+            size: 32,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidatingButton() {
     return Container(
-      color: Colors.black.withValues(alpha: 0.85),
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(alpha: 0.2),
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: CircularProgressIndicator(
+            strokeWidth: 3,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Photo preview screen with confirm/retake options
+  Widget _buildPhotoPreview() {
+    return Container(
+      color: Colors.black,
       child: SafeArea(
         child: Column(
           children: [
-            // Close button
-            Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: IconButton(
-                  onPressed: () {
-                    _countdownTimer?.cancel();
-                    Navigator.of(context).pop(null);
-                  },
-                  icon: const Icon(Icons.close, color: Colors.white70, size: 28),
-                ),
-              ),
-            ),
-
-            const Spacer(flex: 2),
-
-            // Camera icon
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF5A8FD4).withValues(alpha: 0.3),
-                    const Color(0xFFD47A9E).withValues(alpha: 0.3),
-                  ],
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 2,
-                ),
-              ),
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                size: 56,
-                color: Colors.white,
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Title
-            const Text(
-              'Get ready for your photo!',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            // Subtitle
-            Text(
-              'Look at the camera and smile',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 48),
-
-            // Countdown number or validating indicator
-            if (_isValidatingPhoto)
-              _buildValidatingIndicator()
-            else
-              _buildCountdownCircle(),
-
-            const Spacer(flex: 3),
-
-            // Tip at bottom
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
+            // Header
+            Padding(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(null),
+                    icon: const Icon(Icons.close, color: Colors.white70, size: 28),
+                  ),
+                  const Text(
+                    'Review Photo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 48), // Balance the close button
+                ],
+              ),
+            ),
+
+            // Photo preview
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: _capturedImagePath != null
+                        ? Image.file(
+                            File(_capturedImagePath!),
+                            fit: BoxFit.contain,
+                          )
+                        : const SizedBox(),
+                  ),
                 ),
               ),
-              child: Row(
+            ),
+
+            // Bottom buttons
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline,
-                    color: Colors.white.withValues(alpha: 0.8),
-                    size: 24,
+                  const Text(
+                    'Is this photo okay?',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Make sure your face is clearly visible and well-lit',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 14,
-                        height: 1.4,
+                  const SizedBox(height: 8),
+                  Text(
+                    'Make sure your face is clearly visible',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Use Photo button
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF5A8FD4), Color(0xFFD47A9E)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF5A8FD4).withValues(alpha: 0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFFD47A9E).withValues(alpha: 0.25),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: _confirmPhoto,
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check, color: Colors.white, size: 22),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Use This Photo',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Retake button
+                  SizedBox(
+                    width: double.infinity,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: _retryPhotoCapture,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.refresh, color: Colors.white.withValues(alpha: 0.9), size: 22),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Retake Photo',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCountdownCircle() {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF5A8FD4), Color(0xFFD47A9E)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF5A8FD4).withValues(alpha: 0.4),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: const Color(0xFFD47A9E).withValues(alpha: 0.25),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          transitionBuilder: (child, animation) {
-            return ScaleTransition(scale: animation, child: child);
-          },
-          child: Text(
-            '$_countdownValue',
-            key: ValueKey<int>(_countdownValue),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildValidatingIndicator() {
-    return Column(
-      children: [
-        const SizedBox(
-          width: 60,
-          height: 60,
-          child: CircularProgressIndicator(
-            strokeWidth: 4,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Validating photo...',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRetryOverlay() {
-    return Container(
-      color: Colors.black.withValues(alpha: 0.85),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Close button
-            Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(null),
-                  icon: const Icon(Icons.close, color: Colors.white70, size: 28),
-                ),
-              ),
-            ),
-
-            const Spacer(flex: 2),
-
-            // Error icon
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFEF4444).withValues(alpha: 0.2),
-                border: Border.all(
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.5),
-                  width: 2,
-                ),
-              ),
-              child: const Icon(
-                Icons.face_retouching_off,
-                size: 56,
-                color: Color(0xFFEF4444),
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Title
-            const Text(
-              'No face detected',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            // Subtitle
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Text(
-                'We couldn\'t detect a face in the photo. Please try again with better lighting.',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                  height: 1.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-
-            const Spacer(flex: 2),
-
-            // Retry button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: SizedBox(
-                width: double.infinity,
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF5A8FD4), Color(0xFFD47A9E)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF5A8FD4).withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                      BoxShadow(
-                        color: const Color(0xFFD47A9E).withValues(alpha: 0.25),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: _retryPhotoCapture,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                        child: Text(
-                          'Try Again',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Cancel button
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-
-            const Spacer(),
           ],
         ),
       ),
@@ -877,6 +888,11 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   }
 
   Widget _buildBody() {
+    // Show photo preview if we have a captured image
+    if (_showPhotoPreview) {
+      return _buildPhotoPreview();
+    }
+
     return Stack(
       children: [
         _isInfoStepCompleted
@@ -905,26 +921,54 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
           width: MediaQuery.of(context).size.width,
           color: widget.isDarkMode ? Colors.black : Colors.white,
         ),
-        LivenessDetectionStepOverlayWidget(
-          cameraController: _cameraController,
-          duration: widget.config.durationLivenessVerify,
-          showDurationUiText: widget.config.showDurationUiText,
-          isDarkMode: widget.isDarkMode,
-          isFaceDetected: _faceDetectedState,
-          camera: CameraPreview(_cameraController!),
-          key: _stepsKey,
-          steps: widget.config.useCustomizedLabel ? customizedLivenessLabel(widget.config.customizedLabel!) : stepLiveness,
-          showCurrentStep: widget.showCurrentStep,
-          onCompleted: () => Future.delayed(
-            const Duration(milliseconds: 500),
-            () => _showPhotoCaptureOverlay(),
-          ),
-        ),
-        // Photo capture countdown overlay
-        if (_showPhotoCaptureScreen) _buildPhotoCaptureOverlay(),
-        // Retry overlay when face validation fails
-        if (_showRetryScreen) _buildRetryOverlay(),
+        // Show liveness steps OR photo capture prompt with camera
+        if (!_showPhotoCapturePrompt)
+          LivenessDetectionStepOverlayWidget(
+            cameraController: _cameraController,
+            duration: widget.config.durationLivenessVerify,
+            showDurationUiText: widget.config.showDurationUiText,
+            isDarkMode: widget.isDarkMode,
+            isFaceDetected: _faceDetectedState,
+            camera: CameraPreview(_cameraController!),
+            key: _stepsKey,
+            steps: widget.config.useCustomizedLabel ? customizedLivenessLabel(widget.config.customizedLabel!) : stepLiveness,
+            showCurrentStep: widget.showCurrentStep,
+            onCompleted: () => Future.delayed(
+              const Duration(milliseconds: 500),
+              () => _showPhotoCaptureOverlay(),
+            ),
+          )
+        else
+          // Camera view for photo capture
+          _buildPhotoCaptureCamera(),
+        // Photo capture prompt overlay (bottom buttons)
+        if (_showPhotoCapturePrompt && !_showPhotoPreview) _buildPhotoCapturePrompt(),
       ],
+    );
+  }
+
+  /// Camera view when in photo capture mode
+  Widget _buildPhotoCaptureCamera() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 60),
+          SizedBox(
+            height: 300,
+            width: 300,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(1000),
+              child: Transform.scale(
+                scale: _cameraController!.value.aspectRatio,
+                child: Center(
+                  child: CameraPreview(_cameraController!),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
