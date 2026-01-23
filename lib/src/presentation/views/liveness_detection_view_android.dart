@@ -802,7 +802,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'This photo won\'t appear on your profile',
+                        'For secure verification only — never displayed publicly',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 12,
