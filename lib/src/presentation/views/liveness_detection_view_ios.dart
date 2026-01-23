@@ -382,9 +382,9 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
           _photoValidationFailed = false;
         });
       }
-      
+
       await HapticFeedback.mediumImpact();
-      
+
       // Only stop image stream if it's actually running
       if (_cameraController?.value.isStreamingImages == true) {
         await _cameraController?.stopImageStream();
@@ -400,7 +400,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
 
       // Validate that the photo contains a face
       final bool hasFace = await _validatePhotoHasFace(finalImage);
-      
+
       if (!hasFace) {
         debugPrint('Photo validation failed: No face detected in captured image');
         _handlePhotoValidationFailed();
@@ -408,7 +408,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       }
 
       debugPrint('Final image path: ${finalImage?.path}');
-      
+
       // Show preview for user confirmation
       if (mounted) {
         setState(() {
@@ -464,7 +464,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   /// Retry taking the photo after validation failure
   Future<void> _retryPhotoCapture() async {
     if (!mounted) return;
-    
+
     // First reset state and hide preview, but don't show camera yet
     setState(() {
       _photoValidationFailed = false;
@@ -473,10 +473,10 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       _showPhotoPreview = false;
       _showPhotoCapturePrompt = false; // Hide camera until it's ready
     });
-    
+
     // Wait for camera to be ready before showing it
     await _restartCameraForPhoto();
-    
+
     if (!mounted) return;
     setState(() {
       _showPhotoCapturePrompt = true;
@@ -488,12 +488,12 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     // Store reference and null out field to prevent access to disposed controller
     final oldController = _cameraController;
     _cameraController = null;
-    
+
     // Dispose old controller
     await oldController?.dispose();
-    
+
     if (!mounted) return;
-    
+
     final camera = availableCams[_cameraIndex];
     final newController = CameraController(
       camera,
@@ -507,7 +507,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       await newController.dispose();
       return;
     }
-    
+
     _cameraController = newController;
     setState(() {});
   }
@@ -681,10 +681,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
                 ],
 
                 // Take Photo / Validating button
-                if (_isValidatingPhoto)
-                  _buildValidatingButton()
-                else
-                  _buildTakePhotoButton(),
+                if (_isValidatingPhoto) _buildValidatingButton() else _buildTakePhotoButton(),
 
                 const SizedBox(height: 16),
 

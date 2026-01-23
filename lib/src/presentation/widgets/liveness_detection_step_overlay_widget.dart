@@ -44,10 +44,10 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   Timer? _countdownTimer;
   int _remainingDuration = 0;
 
-  // Support message timer - shows after 10 seconds without face detection
+  // Support message timer - shows after 5 seconds without face detection
   Timer? _supportMessageTimer;
   bool _showSupportMessage = false;
-  bool _faceEverDetected = false;
+  DateTime? _lastFaceDetectedTime;
 
   static const double _indicatorMaxStep = 100;
   static const double _heightLine = 25;
@@ -73,11 +73,19 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   }
 
   void _startSupportMessageTimer() {
-    _supportMessageTimer = Timer(const Duration(seconds: 10), () {
-      if (mounted && !_faceEverDetected) {
-        setState(() {
-          _showSupportMessage = true;
-        });
+    _supportMessageTimer?.cancel();
+    _supportMessageTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        // Check if we haven't seen a face in the last 5 seconds
+        final now = DateTime.now();
+        final noRecentFace = _lastFaceDetectedTime == null ||
+            now.difference(_lastFaceDetectedTime!).inSeconds >= 5;
+
+        if (noRecentFace && !_showSupportMessage) {
+          setState(() {
+            _showSupportMessage = true;
+          });
+        }
       }
     });
   }
@@ -85,15 +93,16 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   @override
   void didUpdateWidget(covariant LivenessDetectionStepOverlayWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Track if face was ever detected to cancel support message
-    if (widget.isFaceDetected && !_faceEverDetected) {
-      _faceEverDetected = true;
+
+    // Track face detection state changes
+    if (widget.isFaceDetected) {
+      // Face detected - update timestamp and cancel pending timer
+      _lastFaceDetectedTime = DateTime.now();
       _supportMessageTimer?.cancel();
-      if (_showSupportMessage) {
-        setState(() {
-          _showSupportMessage = false;
-        });
-      }
+      // Note: We don't hide the message once shown - it stays visible
+    } else if (oldWidget.isFaceDetected && !widget.isFaceDetected) {
+      // Face was just lost - start/restart the 5-second timer
+      _startSupportMessageTimer();
     }
   }
 
@@ -285,47 +294,67 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   }
 
   Widget _buildSupportMessage() {
+    // Brand colors from style guide
+    const ctaBlue = Color(0xFF5A8FD4);
+    const ctaPink = Color(0xFFD47A9E);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: widget.isDarkMode
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.05),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: widget.isDarkMode
+              ? [
+                  ctaBlue.withValues(alpha: 0.2),
+                  ctaPink.withValues(alpha: 0.2),
+                ]
+              : [
+                  ctaBlue.withValues(alpha: 0.1),
+                  ctaPink.withValues(alpha: 0.1),
+                ],
+        ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: widget.isDarkMode
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.1),
+              ? ctaBlue.withValues(alpha: 0.4)
+              : ctaBlue.withValues(alpha: 0.3),
+          width: 1,
         ),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Text(
-            'Liveness not working?',
-            style: TextStyle(
-              color: widget.isDarkMode ? Colors.white : Colors.black,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+          Icon(
+            Icons.support_agent_rounded,
+            color: widget.isDarkMode ? Colors.white : ctaBlue,
+            size: 24,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Contact support at',
-            style: TextStyle(
-              color: widget.isDarkMode
-                  ? Colors.white.withValues(alpha: 0.7)
-                  : Colors.black.withValues(alpha: 0.7),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'support@marriage4life.app',
-            style: TextStyle(
-              color: widget.isDarkMode ? Colors.white : Colors.black,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Liveness not working?',
+                  style: TextStyle(
+                    color: widget.isDarkMode ? Colors.white : const Color(0xFF1F2937),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Contact support@marriage4life.app',
+                  style: TextStyle(
+                    color: widget.isDarkMode
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : const Color(0xFF374151),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
