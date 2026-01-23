@@ -44,6 +44,11 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   Timer? _countdownTimer;
   int _remainingDuration = 0;
 
+  // Support message timer - shows after 10 seconds without face detection
+  Timer? _supportMessageTimer;
+  bool _showSupportMessage = false;
+  bool _faceEverDetected = false;
+
   static const double _indicatorMaxStep = 100;
   static const double _heightLine = 25;
 
@@ -58,12 +63,38 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
     super.initState();
     _initializeControllers();
     _initializeTimer();
+    _startSupportMessageTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       setState(() {
         _pageViewVisible = true;
       });
     });
     debugPrint('showCurrentStep ${widget.showCurrentStep}');
+  }
+
+  void _startSupportMessageTimer() {
+    _supportMessageTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && !_faceEverDetected) {
+        setState(() {
+          _showSupportMessage = true;
+        });
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant LivenessDetectionStepOverlayWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Track if face was ever detected to cancel support message
+    if (widget.isFaceDetected && !_faceEverDetected) {
+      _faceEverDetected = true;
+      _supportMessageTimer?.cancel();
+      if (_showSupportMessage) {
+        setState(() {
+          _showSupportMessage = false;
+        });
+      }
+    }
   }
 
   void _initializeControllers() {
@@ -120,6 +151,7 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
   void dispose() {
     _pageController.dispose();
     _countdownTimer?.cancel();
+    _supportMessageTimer?.cancel();
     super.dispose();
   }
 
@@ -236,6 +268,10 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
         _buildCircularCamera(),
         const SizedBox(height: 16),
         _buildFaceDetectionStatus(),
+        if (_showSupportMessage) ...[
+          const SizedBox(height: 16),
+          _buildSupportMessage(),
+        ],
         const SizedBox(height: 16),
         Visibility(
           visible: _pageViewVisible,
@@ -245,6 +281,55 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
         const SizedBox(height: 16),
         widget.isDarkMode ? _buildLoaderDarkMode() : _buildLoaderLightMode(),
       ],
+    );
+  }
+
+  Widget _buildSupportMessage() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: widget.isDarkMode
+            ? Colors.white.withValues(alpha: 0.1)
+            : Colors.black.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: widget.isDarkMode
+              ? Colors.white.withValues(alpha: 0.2)
+              : Colors.black.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            'Liveness not working?',
+            style: TextStyle(
+              color: widget.isDarkMode ? Colors.white : Colors.black,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Contact support at',
+            style: TextStyle(
+              color: widget.isDarkMode
+                  ? Colors.white.withValues(alpha: 0.7)
+                  : Colors.black.withValues(alpha: 0.7),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'support@marriage4life.app',
+            style: TextStyle(
+              color: widget.isDarkMode ? Colors.white : Colors.black,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
