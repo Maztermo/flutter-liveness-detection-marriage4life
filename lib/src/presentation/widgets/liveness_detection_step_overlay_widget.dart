@@ -277,10 +277,6 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
         _buildCircularCamera(),
         const SizedBox(height: 16),
         _buildFaceDetectionStatus(),
-        if (_showSupportMessage) ...[
-          const SizedBox(height: 16),
-          _buildSupportMessage(),
-        ],
         const SizedBox(height: 16),
         Visibility(
           visible: _pageViewVisible,
@@ -345,7 +341,7 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Contact support@marriage4life.app',
+                  'A skip option will appear shortly',
                   style: TextStyle(
                     color: widget.isDarkMode
                         ? Colors.white.withValues(alpha: 0.7)

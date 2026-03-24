@@ -48,7 +48,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   bool _hasEverDetectedFace = false;
   late ResolutionPreset _currentResolution;
   int _framesAtCurrentResolution = 0;
-  static const int _framesBeforeResolutionSwitch = 45; // ~1.5s at 30fps
+  static const int _framesBeforeResolutionSwitch = 150; // ~5s at 30fps
   static const List<ResolutionPreset> _resolutionCycle = [
     ResolutionPreset.high,
     ResolutionPreset.medium,
@@ -295,7 +295,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     if (delay == null) return;
     _skipButtonTimer?.cancel();
     _skipButtonTimer = Timer(Duration(seconds: delay), () {
-      if (mounted && !_hasEverDetectedFace) {
+      if (mounted) {
         setState(() => _showSkipButton = true);
       }
     });
@@ -341,12 +341,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
         _resetSteps();
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
-        if (!_hasEverDetectedFace) {
-          _hasEverDetectedFace = true;
-          _skipButtonTimer?.cancel();
-          _skipButtonTimer = null;
-          if (_showSkipButton) _showSkipButton = false;
-        }
+        _hasEverDetectedFace = true;
         _framesAtCurrentResolution = 0;
         if (mounted) setState(() => _faceDetectedState = true);
         final currentIndex = _stepsKey.currentState?.currentIndex ?? 0;

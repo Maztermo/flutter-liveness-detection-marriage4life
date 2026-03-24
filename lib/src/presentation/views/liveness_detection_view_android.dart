@@ -44,7 +44,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
   bool _hasEverDetectedFace = false;
   late ResolutionPreset _currentResolution;
   int _framesAtCurrentResolution = 0;
-  static const int _framesBeforeResolutionSwitch = 45; // ~1.5s at 30fps
+  static const int _framesBeforeResolutionSwitch = 150; // ~5s at 30fps
   static const List<ResolutionPreset> _resolutionCycle = [
     ResolutionPreset.high,
     ResolutionPreset.medium,
@@ -298,7 +298,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     if (delay == null) return;
     _skipButtonTimer?.cancel();
     _skipButtonTimer = Timer(Duration(seconds: delay), () {
-      if (mounted && !_hasEverDetectedFace) {
+      if (mounted) {
         setState(() => _showSkipButton = true);
       }
     });
@@ -470,12 +470,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
         // Face detected - lock in this resolution, cancel skip, reset counters
-        if (!_hasEverDetectedFace) {
-          _hasEverDetectedFace = true;
-          _skipButtonTimer?.cancel();
-          _skipButtonTimer = null;
-          if (_showSkipButton) _showSkipButton = false;
-        }
+        _hasEverDetectedFace = true;
         _consecutiveFramesWithoutFace = 0;
         _framesAtCurrentResolution = 0;
 
