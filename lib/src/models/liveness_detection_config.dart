@@ -10,6 +10,7 @@ class LivenessDetectionConfig {
   final bool isEnableMaxBrightness;
   final int imageQuality;
   final ResolutionPreset cameraResolution;
+  final int? skipButtonDelaySeconds;
 
   LivenessDetectionConfig({
     this.startWithInfoScreen = false,
@@ -20,5 +21,6 @@ class LivenessDetectionConfig {
     this.isEnableMaxBrightness = true,
     this.imageQuality = 100,
     this.cameraResolution = ResolutionPreset.high,
+    this.skipButtonDelaySeconds,
   });
 }

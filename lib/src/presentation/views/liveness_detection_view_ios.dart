@@ -59,6 +59,10 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   ];
   int _resolutionCycleIndex = 0;
 
+  // Skip button state
+  bool _showSkipButton = false;
+  Timer? _skipButtonTimer;
+
   // Photo capture state
   bool _showPhotoCapturePrompt = false;
   bool _showPhotoPreview = false;
@@ -215,6 +219,8 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   void dispose() {
     _timerToDetectFace?.cancel();
     _timerToDetectFace = null;
+    _skipButtonTimer?.cancel();
+    _skipButtonTimer = null;
     _cameraController?.dispose();
     shuffleListLivenessChallenge(
         list: widget.config.useCustomizedLabel && widget.config.customizedLabel != null
@@ -276,11 +282,23 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
       setState(() {});
     });
     _startFaceDetectionTimer();
+    _startSkipButtonTimer();
   }
 
   void _startFaceDetectionTimer() {
     _timerToDetectFace =
         Timer(Duration(seconds: widget.config.durationLivenessVerify ?? 45), () => _onDetectionCompleted(imgToReturn: null));
+  }
+
+  void _startSkipButtonTimer() {
+    final delay = widget.config.skipButtonDelaySeconds;
+    if (delay == null) return;
+    _skipButtonTimer?.cancel();
+    _skipButtonTimer = Timer(Duration(seconds: delay), () {
+      if (mounted && !_hasEverDetectedFace) {
+        setState(() => _showSkipButton = true);
+      }
+    });
   }
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
@@ -323,7 +341,12 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
         _resetSteps();
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
-        _hasEverDetectedFace = true;
+        if (!_hasEverDetectedFace) {
+          _hasEverDetectedFace = true;
+          _skipButtonTimer?.cancel();
+          _skipButtonTimer = null;
+          if (_showSkipButton) _showSkipButton = false;
+        }
         _framesAtCurrentResolution = 0;
         if (mounted) setState(() => _faceDetectedState = true);
         final currentIndex = _stepsKey.currentState?.currentIndex ?? 0;
@@ -1098,7 +1121,30 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
           _buildPhotoCaptureCamera(),
         // Photo capture prompt overlay (bottom buttons)
         if (_showPhotoCapturePrompt && !_showPhotoPreview) _buildPhotoCapturePrompt(),
+        // Skip button when face detection is struggling
+        if (_showSkipButton && !_showPhotoCapturePrompt) _buildSkipButton(),
       ],
+    );
+  }
+
+  Widget _buildSkipButton() {
+    return Positioned(
+      bottom: 32,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: TextButton(
+          onPressed: () => Navigator.of(context).pop('SKIPPED'),
+          child: Text(
+            'Having trouble? Skip for now',
+            style: TextStyle(
+              color: widget.isDarkMode ? Colors.white70 : Colors.black54,
+              fontSize: 14,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
