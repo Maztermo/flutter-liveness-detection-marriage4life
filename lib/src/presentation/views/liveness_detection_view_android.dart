@@ -40,6 +40,20 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
   int _frameCounter = 0; // Keep for debug logging only
   int _consecutiveFramesWithoutFace = 0; // Counter for tolerance
   static const int _maxFramesWithoutFaceBeforeReset = 15; // 0.5 seconds at 30fps
+  // Resolution cycling: try different resolutions if detection fails
+  bool _hasEverDetectedFace = false;
+  late ResolutionPreset _currentResolution;
+  int _framesAtCurrentResolution = 0;
+  static const int _framesBeforeResolutionSwitch = 45; // ~1.5s at 30fps
+  static const List<ResolutionPreset> _resolutionCycle = [
+    ResolutionPreset.high,
+    ResolutionPreset.medium,
+    ResolutionPreset.low,
+    ResolutionPreset.high,
+    ResolutionPreset.medium,
+    ResolutionPreset.low,
+  ];
+  int _resolutionCycleIndex = 0;
 
   // Detection state variables
   late bool _isInfoStepCompleted;
@@ -194,6 +208,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
 
   @override
   void initState() {
+    _currentResolution = widget.config.cameraResolution;
     _preInitCallBack();
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _postFrameCallBack());
@@ -253,7 +268,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.high, // High resolution for better image quality
+      _currentResolution,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420, // Request YUV420 format (Android uses NV21 variant)
     );
@@ -416,9 +431,15 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     if (inputImage.metadata?.size != null && inputImage.metadata?.rotation != null) {
       if (faces.isEmpty) {
         _consecutiveFramesWithoutFace++;
+        _framesAtCurrentResolution++;
 
         if (_frameCounter % 30 == 0) {
           debugPrint('No face detected. Consecutive frames: $_consecutiveFramesWithoutFace');
+        }
+
+        // Cycle resolution if no face found for too long at current resolution
+        if (!_hasEverDetectedFace && _framesAtCurrentResolution >= _framesBeforeResolutionSwitch) {
+          _tryNextResolution();
         }
 
         // Only reset if face is lost for multiple consecutive frames (0.5 seconds)
@@ -430,8 +451,10 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
 
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
-        // Face detected - reset the lost frame counter
+        // Face detected - lock in this resolution and reset counters
+        _hasEverDetectedFace = true;
         _consecutiveFramesWithoutFace = 0;
+        _framesAtCurrentResolution = 0;
 
         if (mounted) setState(() => _faceDetectedState = true);
         final currentIndex = _stepsKey.currentState?.currentIndex ?? 0;
@@ -630,7 +653,7 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     final camera = availableCams[_cameraIndex];
     final newController = CameraController(
       camera,
-      ResolutionPreset.high,
+      _currentResolution,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
@@ -642,6 +665,45 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     }
 
     _cameraController = newController;
+    setState(() {});
+  }
+
+  /// Cycles to the next resolution when detection can't find a face (high → medium → low → repeat once)
+  void _tryNextResolution() {
+    _resolutionCycleIndex++;
+    if (_resolutionCycleIndex >= _resolutionCycle.length) return; // Exhausted all attempts
+
+    final nextResolution = _resolutionCycle[_resolutionCycleIndex];
+    debugPrint('🔄 Cycling camera resolution: $_currentResolution → $nextResolution (attempt ${_resolutionCycleIndex + 1}/${_resolutionCycle.length})');
+    _currentResolution = nextResolution;
+    _framesAtCurrentResolution = 0;
+
+    _restartCameraWithNewResolution();
+  }
+
+  Future<void> _restartCameraWithNewResolution() async {
+    final oldController = _cameraController;
+    _cameraController = null;
+    await oldController?.dispose();
+
+    if (!mounted) return;
+
+    final camera = availableCams[_cameraIndex];
+    final newController = CameraController(
+      camera,
+      _currentResolution,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    await newController.initialize();
+    if (!mounted) {
+      await newController.dispose();
+      return;
+    }
+
+    _cameraController = newController;
+    _cameraController?.startImageStream(_processCameraImage);
     setState(() {});
   }
 

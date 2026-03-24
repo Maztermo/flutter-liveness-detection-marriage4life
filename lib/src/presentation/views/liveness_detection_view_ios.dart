@@ -44,6 +44,21 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   static late List<LivenessDetectionStepItem> _cachedShuffledSteps;
   static bool _isShuffled = false;
 
+  // Resolution cycling: try different resolutions if detection fails
+  bool _hasEverDetectedFace = false;
+  late ResolutionPreset _currentResolution;
+  int _framesAtCurrentResolution = 0;
+  static const int _framesBeforeResolutionSwitch = 45; // ~1.5s at 30fps
+  static const List<ResolutionPreset> _resolutionCycle = [
+    ResolutionPreset.high,
+    ResolutionPreset.medium,
+    ResolutionPreset.low,
+    ResolutionPreset.high,
+    ResolutionPreset.medium,
+    ResolutionPreset.low,
+  ];
+  int _resolutionCycleIndex = 0;
+
   // Photo capture state
   bool _showPhotoCapturePrompt = false;
   bool _showPhotoPreview = false;
@@ -190,6 +205,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
 
   @override
   void initState() {
+    _currentResolution = widget.config.cameraResolution;
     _preInitCallBack();
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _postFrameCallBack());
@@ -249,7 +265,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     final camera = availableCams[_cameraIndex];
     _cameraController = CameraController(
       camera,
-      ResolutionPreset.high, // High resolution for better image quality
+      _currentResolution,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.bgra8888, // iOS uses BGRA8888 format
     );
@@ -300,9 +316,15 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
 
     if (inputImage.metadata?.size != null && inputImage.metadata?.rotation != null) {
       if (faces.isEmpty) {
+        _framesAtCurrentResolution++;
+        if (!_hasEverDetectedFace && _framesAtCurrentResolution >= _framesBeforeResolutionSwitch) {
+          _tryNextResolution();
+        }
         _resetSteps();
         if (mounted) setState(() => _faceDetectedState = false);
       } else {
+        _hasEverDetectedFace = true;
+        _framesAtCurrentResolution = 0;
         if (mounted) setState(() => _faceDetectedState = true);
         final currentIndex = _stepsKey.currentState?.currentIndex ?? 0;
         if (widget.config.useCustomizedLabel) {
@@ -497,7 +519,7 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     final camera = availableCams[_cameraIndex];
     final newController = CameraController(
       camera,
-      ResolutionPreset.high,
+      _currentResolution,
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.bgra8888,
     );
@@ -509,6 +531,45 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
     }
 
     _cameraController = newController;
+    setState(() {});
+  }
+
+  /// Cycles to the next resolution when detection can't find a face
+  void _tryNextResolution() {
+    _resolutionCycleIndex++;
+    if (_resolutionCycleIndex >= _resolutionCycle.length) return;
+
+    final nextResolution = _resolutionCycle[_resolutionCycleIndex];
+    debugPrint('🔄 Cycling camera resolution: $_currentResolution → $nextResolution (attempt ${_resolutionCycleIndex + 1}/${_resolutionCycle.length})');
+    _currentResolution = nextResolution;
+    _framesAtCurrentResolution = 0;
+
+    _restartCameraWithNewResolution();
+  }
+
+  Future<void> _restartCameraWithNewResolution() async {
+    final oldController = _cameraController;
+    _cameraController = null;
+    await oldController?.dispose();
+
+    if (!mounted) return;
+
+    final camera = availableCams[_cameraIndex];
+    final newController = CameraController(
+      camera,
+      _currentResolution,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.bgra8888,
+    );
+
+    await newController.initialize();
+    if (!mounted) {
+      await newController.dispose();
+      return;
+    }
+
+    _cameraController = newController;
+    _cameraController?.startImageStream(_processCameraImage);
     setState(() {});
   }
 

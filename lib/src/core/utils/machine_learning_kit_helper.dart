@@ -19,12 +19,20 @@ class MachineLearningKitHelper {
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       debugPrint('ML Kit face detection attempt ${attempt + 1}/$maxAttempts');
-      final List<Face> faces = await faceDetector.processImage(imgFile);
-      debugPrint('  Faces detected: ${faces.length}');
-      
-      if (faces.isNotEmpty) {
-        debugPrint('  ✅ Face found! Bounding box: ${faces.first.boundingBox}');
-        return faces;
+      try {
+        final List<Face> faces = await faceDetector.processImage(imgFile);
+        debugPrint('  Faces detected: ${faces.length}');
+
+        if (faces.isNotEmpty) {
+          debugPrint('  ✅ Face found! Bounding box: ${faces.first.boundingBox}');
+          return faces;
+        }
+      } catch (e) {
+        debugPrint('Face detection error (attempt ${attempt + 1}): $e');
+        if (e.toString().contains('InputImageConverterError') ||
+            e.toString().contains('ImageFormat is not supported')) {
+          return [];
+        }
       }
     }
 

@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter_liveness_detection_randomized_plugin/src/models/liveness_detection_label_model.dart';
 
 class LivenessDetectionConfig {
@@ -8,6 +9,7 @@ class LivenessDetectionConfig {
   final LivenessDetectionLabelModel? customizedLabel;
   final bool isEnableMaxBrightness;
   final int imageQuality;
+  final ResolutionPreset cameraResolution;
 
   LivenessDetectionConfig({
     this.startWithInfoScreen = false,
@@ -17,5 +19,6 @@ class LivenessDetectionConfig {
     this.customizedLabel,
     this.isEnableMaxBrightness = true,
     this.imageQuality = 100,
+    this.cameraResolution = ResolutionPreset.high,
   });
 }
