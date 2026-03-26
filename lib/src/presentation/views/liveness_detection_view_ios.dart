@@ -302,6 +302,8 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   }
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
+    if (_isBusy) return;
+
     final camera = availableCams[_cameraIndex];
     final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
     if (imageRotation == null) return;

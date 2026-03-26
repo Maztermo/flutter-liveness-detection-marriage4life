@@ -305,6 +305,8 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
   }
 
   Future<void> _processCameraImage(CameraImage cameraImage) async {
+    if (_isBusy) return;
+
     _frameCounter++;
 
     // Debug logging every 30 frames
