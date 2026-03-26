@@ -1,4 +1,5 @@
 // ignore_for_file: depend_on_referenced_packages
+import 'dart:math' as math;
 import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_liveness_detection_randomized_plugin/index.dart';
@@ -1134,9 +1135,11 @@ class _LivenessDetectionViewIOSState extends State<LivenessDetectionViewIOS> {
   Widget _buildSkipButton() {
     const ctaBlue = Color(0xFF5A8FD4);
     const ctaPink = Color(0xFFD47A9E);
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final bottomOffset = math.max(56.0, 32.0 + bottomInset);
 
     return Positioned(
-      bottom: 32,
+      bottom: bottomOffset,
       left: 0,
       right: 0,
       child: Center(
