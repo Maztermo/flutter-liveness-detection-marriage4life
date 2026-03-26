@@ -399,9 +399,14 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
                   )),
         ),
         const SizedBox(width: 16),
-        Text(
-          widget.isFaceDetected ? 'User Face Found' : 'User Face Not Found...',
-          style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
+        Flexible(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              widget.isFaceDetected ? 'User Face Found' : 'User Face Not Found...',
+              style: TextStyle(color: widget.isDarkMode ? Colors.white : Colors.black),
+            ),
+          ),
         ),
       ],
     );
@@ -433,13 +438,16 @@ class LivenessDetectionStepOverlayWidgetState extends State<LivenessDetectionSte
         alignment: Alignment.center,
         margin: const EdgeInsets.symmetric(horizontal: 30),
         padding: const EdgeInsets.all(10),
-        child: Text(
-          widget.steps[index].title,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: widget.isDarkMode ? Colors.white : Colors.black,
-            fontSize: 24,
-            fontWeight: FontWeight.w500,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            widget.steps[index].title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: widget.isDarkMode ? Colors.white : Colors.black,
+              fontSize: 24,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),

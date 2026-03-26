@@ -759,9 +759,11 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
     }
     if (widget.isEnableSnackBar) {
       final snackBar = SnackBar(
-        content: Text(imgToReturn == null
-            ? 'Verification of liveness detection failed, please try again. (Exceeds time limit ${widget.config.durationLivenessVerify ?? 45} second.)'
-            : 'Verification of liveness detection success!'),
+        content: Text(
+          imgToReturn == null
+              ? 'Verification failed. Time limit of ${widget.config.durationLivenessVerify ?? 45}s exceeded.'
+              : 'Verification successful!',
+        ),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(snackBar);
@@ -891,11 +893,16 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
                         color: Colors.white.withValues(alpha: 0.5),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        'For secure verification only — never displayed publicly',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'For secure verification only — never displayed publicly',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.5),
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1259,19 +1266,44 @@ class _LivenessDetectionViewAndroidState extends State<LivenessDetectionViewAndr
   }
 
   Widget _buildSkipButton() {
+    const ctaBlue = Color(0xFF5A8FD4);
+    const ctaPink = Color(0xFFD47A9E);
+
     return Positioned(
       bottom: 32,
       left: 0,
       right: 0,
       child: Center(
-        child: TextButton(
-          onPressed: () => Navigator.of(context).pop('SKIPPED'),
-          child: Text(
-            'Having trouble? Skip for now',
-            style: TextStyle(
-              color: widget.isDarkMode ? Colors.white70 : Colors.black54,
-              fontSize: 14,
-              decoration: TextDecoration.underline,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: widget.isDarkMode
+                  ? [ctaBlue.withValues(alpha: 0.3), ctaPink.withValues(alpha: 0.3)]
+                  : [ctaBlue, ctaPink],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: widget.isDarkMode
+                ? Border.all(color: ctaBlue.withValues(alpha: 0.5), width: 1)
+                : null,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.of(context).pop('SKIPPED'),
+              borderRadius: BorderRadius.circular(24),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                child: Text(
+                  'Skip for now',
+                  style: TextStyle(
+                    color: widget.isDarkMode ? Colors.white : Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ),
           ),
         ),
